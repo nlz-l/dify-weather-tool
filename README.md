@@ -2,20 +2,22 @@
 
 [![Python](https://img.shields.io/badge/python-3.13+-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Dify](https://img.shields.io/badge/Dify-Platform-1677FF)](https://dify.ai)
 
-为 [Dify](https://dify.ai) AI 平台定制的天气查询微服务，返回自然语言格式的天气结果供大模型直接使用。
+> 为 Dify AI 平台开发的天气查询工具微服务。展示 FastAPI 微服务设计、第三方 API 封装、LLM 工具集成能力。
 
 ---
 
-## ✨ 功能特性
+## 🏗️ 架构
 
-| 功能 | 说明 |
-|---|---|
-| 🌤️ 天气查询 | 38 个中国主要城市实时天气 |
-| 🔐 鉴权 | Bearer Token 认证 |
-| 🗣️ 自然语言输出 | 结果直接适合大模型转述 |
-| 📡 数据源 | `t.weather.itboy.net` API |
+```text
+┌──────────┐     HTTP POST      ┌──────────────┐     HTTP GET     ┌──────────────┐
+│   Dify    │ ─────────────────→ │  Dify 天气工具 │ ──────────────→ │  天气数据源    │
+│  AI 平台  │ ←───────────────── │  FastAPI 微服务│ ←────────────── │  itboy.net   │
+└──────────┘   自然语言天气结果    └──────────────┘    JSON 天气数据   └──────────────┘
+```
+
+**数据流**：Dify Agent 识别用户"查天气"意图 → 调用本服务 `/weather` → 查询天气 API → 格式化自然语言 → 返回 LLM 转述
 
 ---
 
@@ -23,69 +25,64 @@
 
 ```text
 Dify/
-├── main.py            # FastAPI 应用入口
-├── pyproject.toml     # 依赖配置（uv）
-├── .env.example       # 环境变量模板
-└── README.md
+├── main.py            # 应用入口：路由 + 城市映射 + 天气 API 调用
+├── pyproject.toml     # 依赖配置（仅 fastapi、requests、uvicorn）
+└── .env.example       # Token 配置
 ```
+
+---
+
+## 🔧 技术选型
+
+| 决策点 | 选择 | 理由 |
+|---|---|---|
+| **框架** | FastAPI | 轻量、自动文档、类型校验 |
+| **HTTP 客户端** | requests | 同步调用外部 API（业务简单，无需异步） |
+| **鉴权** | Bearer Token | Dify 平台原生支持的方式 |
+| **输出格式** | 自然语言字符串 | LLM 擅长理解自然语言，降低 Dify 端 Prompt 复杂度 |
 
 ---
 
 ## 🚀 快速开始
 
-环境要求：Python 3.13+、[uv](https://docs.astral.sh/uv/)
-
 ```bash
+git clone https://github.com/your/dify-weather.git
+cd dify-weather
+
 uv sync
-$env:DIFY_WEATHER_TOKEN="your-secret-token"   # PowerShell
-uv run python main.py                          # → http://localhost:8081
+$env:DIFY_WEATHER_TOKEN="your-token"    # PowerShell
+# export DIFY_WEATHER_TOKEN="your-token"  # bash
+
+uv run python main.py     # → http://localhost:8081
 ```
 
 ---
 
-## 📡 接口文档
+## 📡 接口
 
-### POST /weather
+**POST /weather**
 
-查询指定城市天气。
-
-**请求：**
-
-```http
-POST /weather HTTP/1.1
-Authorization: Bearer <token>
-Content-Type: application/json
-
+```json
+// Request
 { "location": "北京" }
+
+// Response (text/plain)
+"北京今天是晴，温度30℃/20℃"
 ```
 
-**响应：**
-
-```text
-北京今天是晴，温度30℃/20℃
-```
-
-**支持城市（38 个）：**
-
-北京、上海、广州、深圳、杭州、南京、成都、重庆、武汉、西安、天津、苏州、长沙、郑州、青岛、大连、厦门、福州、合肥、济南、哈尔滨、长春、沈阳、昆明、贵阳、南宁、海口、兰州、乌鲁木齐、呼和浩特、拉萨、银川、西宁、石家庄、太原、宁波、无锡、珠海
+支持 38 个中国主要城市。
 
 ---
 
-## 🔗 接入 Dify
+## 🔗 Dify 平台接入
 
-1. Dify 工作台 → **工具** → **创建自定义工具**
-2. 请求方法：`POST`，地址：`http://<your-server>:8081/weather`
-3. 请求头：`Authorization: Bearer <your-token>`
-4. 请求体字段：`location`（string）
-5. 在 Agent 应用中关联该工具
+1. Dify 工作台 → 工具 → 创建自定义工具
+2. 选择 OpenAPI / Swagger 导入，或手动配置：
+   - 方法：`POST`
+   - URL：`http://<server>:8081/weather`
+   - 请求头：`Authorization: Bearer <token>`
+   - 请求体：`{ "location": "string" }`
+3. 在 Agent 应用中关联该工具
 
 ---
 
-## ⚠️ 注意事项
-
-| 项目 | 说明 |
-|---|---|
-| 数据源 | 依赖 `t.weather.itboy.net`，网络异常时查询失败 |
-| 城市列表 | 当前硬编码 38 个城市，扩展需修改源码 |
-| 安全 | Bearer Token 适合学习/本地演示，生产环境建议升级为 API Key + HTTPS |
-| 端口 | 默认 8081，可在代码中修改 |
